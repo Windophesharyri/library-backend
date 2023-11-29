@@ -1,0 +1,104 @@
+-- Active: 1700723405950@@127.0.0.1@5432@newlibr@public
+
+
+SELECT * FROM authors
+
+SELECT * FROM genres
+
+SELECT * FROM readers
+
+SELECT * FROM books
+
+SELECT * FROM give_process
+
+
+--1. Выбрать все книги автора «А.С.Пушкин» (отобразить название книги и жанр).
+
+SELECT b.title, a.name FROM authors a 
+JOIN books b ON a.author_id = b.author_id
+WHERE a.name = 'Пушкин Александр Сергеевич'
+
+--2. Выбрать все книги автора «А.С.Пушкин» имеющиеся в наличии в данное время 
+--(отобразить название книги и жанр).
+
+SELECT b.title, a.name FROM authors a 
+JOIN books b ON a.author_id = b.author_id
+WHERE a.name = 'Пушкин Александр Сергеевич' AND b.storage_count > 0
+
+--3. Выбрать все книги имеющиеся в разделе «ОС»
+
+SELECT title FROM books WHERE title LIKE 'Д%'
+
+--4. Выбрать все книги прочитанные Андреевым Олегом в мае 2014г., включая и находящиеся на
+--руках. (отобразить автора книги и название) .
+
+SELECT CONCAT(r.surname, ' ', r.name, ' ', r.patronymic) AS full_name, b.title, gp.date_out, gp.date_in
+FROM give_process gp
+JOIN books b ON gp.book_id = b.book_id
+JOIN readers r ON gp.reader_id = r.reader_id
+WHERE r.surname = 'Иванова' AND r.name = 'Мария' AND r.patronymic = 'Александровна'
+GROUP BY r.surname, r.name, r.patronymic, b.title, gp.date_out, gp.date_in
+HAVING EXTRACT(MONTH FROM gp.date_out) = 7 AND EXTRACT(YEAR FROM gp.date_out) = 2023
+
+--5. Вывести количество книг прочитанное каждым читателем, включая и те что на руках
+--(отобразить номер абонента, ФИО читателя, количество прочитанных книг).
+SELECT CONCAT(r.surname, ' ', r.name, ' ', r.patronymic) AS full_name, r.phone, COUNT(gp.book_id)
+FROM readers r
+JOIN give_process gp ON r.reader_id = gp.reader_id
+GROUP BY r.reader_id, r.name, r.patronymic, r.phone;
+
+--6. Отобразить название всех книг находящихся на руках у читателей с указанием автора книги,
+--названия книги, номера абонента и ФИО читателя.
+
+SELECT b.title, a.author_id, r.phone, CONCAT(r.surname, ' ', r.name, ' ', r.patronymic) AS full_name
+FROM give_process gp
+JOIN books b ON gp.book_id = b.book_id
+JOIN authors a ON b.author_id = a.author_id
+JOIN readers r ON gp.reader_id = r.reader_id
+WHERE gp.returned = FALSE
+
+--7. Вывести полную информацию о самом активном читателе (прочитал больше всех
+--книг).
+
+SELECT CONCAT(r.surname, ' ', r.name, ' ', r.patronymic) AS full_name, r.passport, r.passport_source, r.phone, COUNT(gp.book_id)
+FROM readers r
+JOIN give_process gp ON r.reader_id = gp.reader_id
+GROUP BY r.surname, r.name, r.patronymic, r.passport, r.passport_source, r.phone
+HAVING ( SELECT MAX(count_col) AS max_count FROM ( SELECT COUNT(book_id) as count_col FROM give_process GROUP BY reader_id ) ) = COUNT(gp.book_id)
+
+--8. Вывести информацию о наиболее популярных 10-ти книгах.
+
+SELECT b.title, a.name, COUNT(gp.book_id)
+FROM give_process gp
+JOIN books b ON gp.book_id = b.book_id
+JOIN authors a ON b.author_id = a.author_id
+GROUP BY b.book_id, a.name
+ORDER BY COUNT(gp.book_id) DESC LIMIT 10;
+
+--9. Вывести месяц в котором было прочитано наибольшее количество книг.
+
+SELECT EXTRACT(MONTH FROM gp.date_in) as month , COUNT(gp.book_id)
+FROM give_process gp
+GROUP BY month
+HAVING EXTRACT(MONTH FROM gp.date_in) = ( 
+    SELECT MAX(count_col) AS max_count 
+        FROM ( 
+            SELECT EXTRACT(MONTH FROM date_in) as count_col 
+            FROM give_process 
+            GROUP BY count_col) 
+        )
+
+--10. Вывести информацию о просроченных книгах (отобразить название книги, ФИО читателя,
+--количество дней просрочки возврата).
+
+SELECT b.title, CONCAT(r.surname, ' ', r.name, ' ', r.patronymic) AS full_name, (CURRENT_DATE - (gp.date_out + gp.day_to_give)) as days
+FROM give_process gp
+JOIN books b ON gp.book_id = b.book_id
+JOIN readers r ON gp.reader_id = r.reader_id
+WHERE CURRENT_DATE > (gp.date_out + gp.day_to_give) AND gp.returned = FALSE
+UNION
+SELECT b.title, CONCAT(r.surname, ' ', r.name, ' ', r.patronymic) AS full_name, (gp.date_in - (gp.date_out + gp.day_to_give)) as days
+FROM give_process gp
+JOIN books b ON gp.book_id = b.book_id
+JOIN readers r ON gp.reader_id = r.reader_id
+WHERE gp.date_in > (gp.date_out + gp.day_to_give) AND gp.returned = TRUE

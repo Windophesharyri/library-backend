@@ -1,0 +1,50 @@
+-- Active: 1700753692365@@127.0.0.1@5432@newlibr@public
+CREATE TABLE authors (
+    author_id SERIAL PRIMARY KEY,
+    name VARCHAR(45) NOT NULL CHECK (char_length(name) >= 2),
+    birthday DATE NOT NULL CHECK (DATE_PART('year', CURRENT_DATE) - DATE_PART('year', birthday) >=  18)
+)
+
+CREATE TABLE genres (
+    genre_id SERIAL PRIMARY KEY,
+    name VARCHAR(20) NOT NULL UNIQUE CHECK (char_length(name) >= 2),
+    description TEXT CHECK (char_length(description) >= 30)
+)
+
+CREATE TABLE readers (
+    reader_id SERIAL PRIMARY KEY,
+    surname VARCHAR(25) NOT NULL CHECK(char_length(surname) >= 2),
+    name VARCHAR(25) NOT NULL CHECK (char_length(name) >= 2),
+    patronymic VARCHAR(25) NOT NULL CHECK (char_length(patronymic) >= 2),
+    passport BIGINT NOT NULL UNIQUE CHECK (passport >= '0000000001' AND passport <= '9999999999'),
+    passport_source VARCHAR(60) NOT NULL CHECK (char_length(passport_source) > 10),
+    phone VARCHAR(16) NOT NULL UNIQUE CHECK (phone ~* '^\+7\(\d{3}\)\d{3}-\d{2}-\d{2}$')
+)
+
+
+CREATE TABLE book_genres (
+    book_id INT,
+    genre_id INT,
+    FOREIGN KEY (book_id) REFERENCES books (book_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (genre_id) REFERENCES genres (genre_id) ON UPDATE CASCADE ON DELETE CASCADE
+)
+
+CREATE TABLE books (
+    book_id SERIAL PRIMARY KEY,
+    title VARCHAR(60) NOT NULL UNIQUE CHECK (char_length(title) >= 1),
+    storage_count INT NOT NULL CHECK (storage_count >= 0),
+    author_id INT,
+    FOREIGN KEY (author_id) REFERENCES authors (author_id) ON UPDATE CASCADE ON DELETE CASCADE
+)
+
+CREATE TABLE give_process (
+    id SERIAL PRIMARY KEY,
+    book_id INT,
+    reader_id INT,
+    DATE_OUT DATE NOT NULL,
+    DATE_IN DATE,
+    returned BOOLEAN,
+    day_to_give INT CHECK (day_to_give <= 31 AND day_to_give >= 1),
+    FOREIGN KEY (book_id) REFERENCES books (book_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    FOREIGN KEY (reader_id) REFERENCES readers (reader_id) ON UPDATE CASCADE ON DELETE CASCADE
+)

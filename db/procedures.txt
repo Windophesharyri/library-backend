@@ -1,0 +1,141 @@
+-- Active: 1700723405950@@127.0.0.1@5432@newlibr@public
+CREATE OR REPLACE PROCEDURE create_author (
+    name_str VARCHAR(45), 
+    birthday_str DATE
+)
+as $$
+DECLARE
+    current_id INT := 0;
+BEGIN
+    current_id = ( SELECT MAX(author_id) FROM authors );
+    INSERT INTO authors (author_id, name, birthday) 
+    VALUES
+        ((current_id + 1), name_str, birthday_str);
+END; 
+    $$
+LANGUAGE PLPGSQL
+
+
+
+CREATE OR REPLACE PROCEDURE create_genre (
+    name_str VARCHAR(45), 
+    description_str TEXT
+)
+as $$
+DECLARE
+    current_id INT := 0;
+BEGIN
+    current_id = ( SELECT MAX(genre_id) FROM genres );
+    INSERT INTO genres (genre_id, name, description) 
+    VALUES
+        ((current_id + 1), name_str, description_str);
+END; 
+    $$
+LANGUAGE PLPGSQL
+
+
+
+
+CREATE OR REPLACE PROCEDURE create_reader (
+    surname_str VARCHAR(25),
+    name_str VARCHAR(25), 
+    patronymic_str VARCHAR(25), 
+    passport_str BIGINT,
+    passport_source_str VARCHAR(60),
+    phone_str VARCHAR(16)
+)
+as $$
+DECLARE
+    current_id INT := 0;
+BEGIN
+    current_id = ( SELECT MAX(reader_id) FROM readers );
+    INSERT INTO readers (reader_id, surname, name, patronymic, passport, passport_source, phone) 
+    VALUES
+        ((current_id + 1), surname_str, name_str, patronymic_str, passport_str, passport_source_str, phone_str);
+END; 
+    $$
+LANGUAGE PLPGSQL
+
+CREATE OR REPLACE PROCEDURE create_book (
+    title_str VARCHAR(45), 
+    storage_count_str INT,
+    author_str VARCHAR(40),
+    picture_str TEXT
+)
+as $$
+DECLARE
+    author_id_str INT := 0;
+    current_id INT := 0;
+BEGIN
+    current_id = ( SELECT MAX(book_id) FROM books );
+    author_id_str = ( SELECT author_id FROM authors WHERE name = author_str );
+    INSERT INTO books (book_id, title, storage_count, author_id, picture) 
+    VALUES
+        ((current_id + 1), title_str, storage_count_str, author_id_str, picture_str);
+END; 
+    $$
+LANGUAGE PLPGSQL
+
+CREATE OR REPLACE PROCEDURE create_book_genres (
+    book_str VARCHAR(60), 
+    genre_str VARCHAR(20)
+)
+as $$
+DECLARE
+    book_id_str INT := 0;
+    genre_id_str INT := 0;
+BEGIN
+    book_id_str = ( SELECT book_id FROM books WHERE title = book_str );
+    genre_id_str = ( SELECT genre_id FROM genres WHERE name = genre_str);
+    INSERT INTO book_genres (book_id, genre_id) 
+    VALUES
+        (book_id_str, genre_id_str);
+END; 
+    $$
+LANGUAGE PLPGSQL
+
+
+CREATE OR REPLACE PROCEDURE create_processs (
+    book_str VARCHAR(60), 
+    reader_surname_str VARCHAR(25),
+    reader_name_str VARCHAR(25),
+    reader_patronymic_str VARCHAR(25),
+    due INT
+)
+as $$
+DECLARE
+    book_id_str INT := 0;
+    reader_id_str INT := 0;
+BEGIN
+    book_id_str = ( SELECT book_id FROM books WHERE title = book_str );
+    IF ( (SELECT storage_count FROM books WHERE title = book_str ) = 0) THEN
+        RAISE EXCEPTION  'This book is not avialable right now';
+    ELSE 
+        reader_id_str = ( SELECT reader_id FROM readers WHERE surname = reader_surname_str AND name = reader_name_str AND patronymic = reader_patronymic_str);
+
+        IF (reader_id_str IS NULL OR book_id_str IS NULL) THEN
+            RAISE EXCEPTION  'This book or reader doesnt exist';
+        ELSE
+            INSERT INTO give_process (book_id, reader_id, date_out, date_in, returned, day_to_give) 
+            VALUES
+                (book_id_str, reader_id_str, CURRENT_DATE, (CURRENT_DATE + due), FALSE, due);
+        END IF;
+    END IF;
+END; 
+    $$
+LANGUAGE PLPGSQL
+
+
+CREATE OR REPLACE PROCEDURE change_processs (
+    id_str INT
+)
+as $$
+DECLARE
+BEGIN
+    UPDATE give_process
+    SET date_in = CURRENT_DATE,
+        returned = TRUE
+    WHERE id = id;
+END; 
+    $$
+LANGUAGE PLPGSQL

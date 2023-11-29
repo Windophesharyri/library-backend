@@ -1,0 +1,39 @@
+-- Active: 1700723405950@@127.0.0.1@5432@newlibr@public
+
+
+SELECT title FROM books WHERE book_id = 5
+
+
+CREATE OR REPLACE FUNCTION change_count_on_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE books
+    SET storage_count = storage_count - 1
+    WHERE title = (SELECT title FROM books WHERE book_id = NEW.book_id);
+    RETURN NEW;
+END;
+$$ LANGUAGE PLPGSQL
+
+CREATE OR REPLACE TRIGGER auto_count
+AFTER INSERT ON give_process
+FOR EACH ROW
+EXECUTE FUNCTION change_count_on_trigger();
+
+
+SELECT b.title FROM books b JOIN give_process gp ON gp.book_id = b.book_id WHERE gp.id = 8
+
+
+CREATE OR REPLACE FUNCTION change_count_on_second_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE books
+    SET storage_count = storage_count + 1
+    WHERE title = (SELECT b.title FROM books b JOIN give_process gp ON gp.book_id = b.book_id WHERE gp.id = NEW.id);
+    RETURN NEW;
+END;
+$$ LANGUAGE PLPGSQL
+
+CREATE OR REPLACE TRIGGER auto_count_second
+AFTER UPDATE ON give_process
+FOR EACH ROW
+EXECUTE FUNCTION change_count_on_second_trigger();
